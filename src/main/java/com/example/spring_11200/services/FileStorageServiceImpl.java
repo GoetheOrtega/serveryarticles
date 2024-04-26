@@ -1,0 +1,89 @@
+package com.example.spring_11200.services;
+
+import com.example.spring_11200.models.FileInfo;
+
+
+import com.example.spring_11200.repositores.FilesRepository;
+import org.apache.commons.io.FilenameUtils;
+import org.apache.commons.io.IOUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.web.multipart.MultipartFile;
+
+import javax.servlet.http.HttpServletResponse;
+import java.io.FileInputStream;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.util.UUID;
+
+
+import java.util.List;
+
+
+@Component
+public class FileStorageServiceImpl implements FileStorageService{
+    @Value("${storage.path}")
+    private String storagePath;
+
+    @Autowired
+    private FilesRepository filesRepository;
+
+    @Override
+    public String saveFile(MultipartFile file, String title, String description) {
+        String storageName = UUID.randomUUID().toString() + "." +
+                FilenameUtils.getExtension(file.getOriginalFilename());
+
+
+
+        FileInfo fileInfo =  FileInfo.builder()
+                .originalFileName(file.getOriginalFilename())
+                .type(file.getContentType())
+                .size(file.getSize())
+                .storageFileName(storageName)
+                .url(storagePath + "\\" + storageName)
+                .description(description)
+                .title(title)
+                .build();
+        try {
+            Files.copy(file.getInputStream(), Paths.get(storagePath, storageName));
+
+        } catch (Exception e) {
+            throw new RuntimeException("Could not store the file. Error: " + e.getMessage());
+        }
+
+        filesRepository.save(fileInfo);
+        return fileInfo.getStorageFileName();
+
+    }
+
+    @Override
+    public void writeFileToResponse(String fileName, HttpServletResponse response) {
+        FileInfo fileInfo = filesRepository.findByStorageFileName(fileName);
+        response.setContentType(fileInfo.getType());
+
+        try {
+            IOUtils.copy(new FileInputStream(fileInfo.getUrl()), response.getOutputStream());
+            response.flushBuffer();
+        } catch (Exception e) {
+            throw new RuntimeException("Could not read the file. Error: " + e.getMessage());
+        }
+    }
+    public List<FileInfo> getAllFiles(){
+        return filesRepository.findAll();
+    }
+
+    @Override
+    public void likeFile(long fileId) {
+        FileInfo file = filesRepository.findById(fileId).orElse(null);
+        if (file != null) {
+            Integer likes = file.getLikes();
+            if (likes!=null) {
+                file.setLikes(likes + 1);
+            } else {
+                file.setLikes(1);
+            }
+            filesRepository.save(file);
+        }
+    }
+}

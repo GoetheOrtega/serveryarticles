@@ -12,48 +12,50 @@ import org.springframework.stereotype.Controller;
 
 import java.util.List;
 
+
 @Component
 public class ArticleServiceImpl implements ArticleService {
 
     @Autowired
-    private ArticleRepository articleRepository;
-    @Autowired
     private UsersRepository usersRepository;
+
+
+    @Autowired
+    private ArticleRepository articleRepository;
+    @Override
+    public List<ArticleDto> getByUser(Long userId) {
+        User user = usersRepository.getOne(userId);
+        List<Article> articlesOfUser = user.getCreatedArticles();
+        return ArticleDto.articleList(articlesOfUser);
+    }
 
     @Override
     public ArticleDto addArticle(Long userId, ArticleForm articleForm) {
-        User user = usersRepository.getOne(userId);
+        int id = 2;
+        User author = usersRepository.getOne(userId);
 
-        Article article = Article.builder()
-                .author(user)
+        Article newArticle = Article.builder()
+                .author(author)
+                .name(articleForm.getName())
                 .type(articleForm.getType())
                 .text(articleForm.getText())
-                .name(articleForm.getName())
                 .build();
 
-        articleRepository.save(article);
-        return ArticleDto.from(article);
+        articleRepository.save(newArticle);
+        return ArticleDto.from(newArticle);
     }
 
     @Override
-    public List<ArticleDto> getByUser(Long id) {
-        User user = usersRepository.getOne(id);
-        List<Article> articleList = user.getCreatedArticles();
-        return ArticleDto.articleList(articleList);
-    }
-
-    @Override
-    public ArticleDto like(Long userId, Long articleId) {
+    public ArticleDto like(Long userId, Long articleId){
         User user = usersRepository.getOne(userId);
         Article article = articleRepository.getOne(articleId);
         if (articleRepository.existsByArticleIdAndLikesContaining(articleId, user)) {
             article.getLikes().remove(user);
-        } else {
+        }
+        else {
             article.getLikes().add(user);
         }
         articleRepository.save(article);
         return ArticleDto.from(article);
     }
-
-
 }
